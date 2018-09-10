@@ -215,8 +215,8 @@ class AlarmOBot:
 
 		ngdp_proc = self.call_ngdp([
 			"install",
+			"hsb",
 			new.build_config,
-			"--out-dir",
 			out_dir
 		])
 
