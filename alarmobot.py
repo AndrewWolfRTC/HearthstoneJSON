@@ -19,7 +19,7 @@ from keg.http import HttpRemote
 DEVNULL = open(os.devnull, "w")
 
 MESSAGE = """
-@everyone
+{mention}
 **Old:**
 ```
 {old}
@@ -85,6 +85,8 @@ class AlarmOBot:
 
 		self.log_buffer = DequeAdapter([], 10)
 		self.logger.addHandler(QueueHandler(self.log_buffer))
+
+		self.mention = "" if self.simulate_new_build else "@everyone"
 
 	def call_proc(self, args, log_stdout=False, log_stderr=False):
 		log_args = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -179,10 +181,12 @@ class AlarmOBot:
 	def on_new_build(self, old, new):
 		# Send an alert on Influx
 		self.write_to_discord(
-			"@everyone Hearthstone build data updated",
+			f"{self.mention} Hearthstone build data updated",
 			tts=True
 		)
-		message = MESSAGE.format(old=old.versions_name, new=new.versions_name)
+		message = MESSAGE.format(
+			mention=self.mention, old=old.versions_name, new=new.versions_name
+		)
 		self.write_to_discord(message + "Downloading...")
 
 		# Send emails
@@ -201,17 +205,12 @@ class AlarmOBot:
 
 		ngdp_proc.wait()
 		if ngdp_proc.returncode != 0:
-			self.write_to_discord(
-				"@everyone Patch download failed: ```{}```".format(
-					"\n".join(map(lambda lr: lr.getMessage(), self.log_buffer))
-				)
-			)
+			error = "\n".join(map(lambda lr: lr.getMessage(), self.log_buffer))
+			self.write_to_discord(f"{self.mention} Patch download failed: ```{error}```")
 			return
 
 		self.write_to_discord(
-			"Successfully downloaded new build, installing to {}...".format(
-				out_dir
-			)
+			f"Successfully downloaded new build, installing to {out_dir}..."
 		)
 
 		ngdp_proc = self.call_ngdp([
@@ -223,10 +222,9 @@ class AlarmOBot:
 
 		ngdp_proc.wait()
 		if ngdp_proc.returncode != 0:
+			error = "\n".join(map(lambda lr: lr.getMessage(), self.log_buffer))
 			self.write_to_discord(
-				"@everyone Patch installation failed: ```{}```".format(
-					"\n".join(map(lambda lr: lr.getMessage(), self.log_buffer))
-				)
+				f"{self.mention} Patch installation failed: ```{error}```"
 			)
 		else:
 			self.write_to_discord(
