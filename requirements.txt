@@ -9,3 +9,4 @@ lz4
 pillow
 unitypack
 pefile
+https://github.com/HearthSim/keg/archive/master.tar.gz
