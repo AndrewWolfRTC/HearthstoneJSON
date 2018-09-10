@@ -24,14 +24,6 @@ HSCODE_GIT="$BASEDIR/hscode.git"
 HSDATA_GIT="$BASEDIR/hsdata.git"
 HSPROTO_GIT="$BASEDIR/hsproto.git"
 
-
-# Base and output path for 'hsb' blte
-NGDP_DIR="/mnt/home/ngdp"
-NGDP_OUT="$NGDP_DIR/out"
-
-# Directory storing the build data files
-HS_RAW_BUILDDIR="/mnt/home/data/ngdp/hsb/$BUILD"
-
 # Directory that contains card textures
 CARDARTDIR="$BUILDDIR/card-art"
 
@@ -41,8 +33,8 @@ HEARTHSTONEJSON_BIN="$BASEDIR/generate_hearthstonejson.sh"
 # HearthstoneJSON generated files directory
 HSJSONDIR="$HOME/projects/HearthstoneJSON/build/html/v1/$BUILD"
 
-# Symlink file for extracted data
-HSBUILDDIR="$BUILDDIR/extracted/$BUILD"
+# Build install output
+HSBUILDDIR="/mnt/home/ngdp/$BUILD"
 
 # Patch downloader
 DOWNLOAD_BIN="$HOME/bin/ngdp-get"
@@ -132,25 +124,9 @@ function check_commit_sh() {
 }
 
 
-function prepare_patch_directories() {
-	echo "Preparing patch directories"
-
+function check_patch_directory() {
 	if [[ -e $HSBUILDDIR ]]; then
-		echo "$HSBUILDDIR already exists, not overwriting."
-	else
-		mkdir -p "$(dirname "$HSBUILDDIR")"
-		if [[ -d $HS_RAW_BUILDDIR ]]; then
-			echo "$HS_RAW_BUILDDIR already exists... skipping download checks."
-		else
-			if ! [[ -d "$NGDP_OUT" ]]; then
-				>&2 echo "No '$NGDP_OUT' directory. Run cd $NGDP_DIR && $DOWNLOAD_BIN"
-				exit 2
-			fi
-			echo "Moving $NGDP_OUT to $HS_RAW_BUILDDIR"
-			mv "$NGDP_OUT" "$HS_RAW_BUILDDIR"
-		fi
-		echo "Creating symlink to build in $HSBUILDDIR"
-		ln -s -v "$HS_RAW_BUILDDIR" "$HSBUILDDIR"
+		>&2 echo "No '$HSBUILDDIR' directory. Run ngdp fetch & install"
 	fi
 }
 
@@ -274,7 +250,7 @@ function main() {
 	upgrade_venv
 	update_repositories
 	check_commit_sh
-	prepare_patch_directories
+	check_patch_directory
 	process_cardxml
 	decompile_code_win
 	decompile_code_osx

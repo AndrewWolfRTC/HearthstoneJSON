@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import boto3
 import requests
 from influxdb import InfluxDBClient
+from keg.http import HttpRemote
 
 
 DEVNULL = open(os.devnull, "w")
@@ -41,8 +42,8 @@ class DequeAdapter(collections.deque):
 class AlarmOBot:
 	def __init__(self, args):
 		p = argparse.ArgumentParser(prog="alarmobot")
-		p.add_argument("--bin", required=True)
-		p.add_argument("--patch-dir", default=".")
+		p.add_argument("--ngdp-bin", required=True)
+		p.add_argument("--ngdp-dir", required=True) # dir that contains .ngdp
 		p.add_argument("--logfile")
 		p.add_argument("--webhook-url", nargs="*")
 		p.add_argument("--influx-url", nargs="?")
@@ -51,10 +52,6 @@ class AlarmOBot:
 		p.add_argument("--to-email", nargs="*")
 		p.add_argument("--post-url", nargs="*")
 		self.args = p.parse_args(args)
-
-		if not os.path.exists(self.args.patch_dir):
-			os.makedirs(self.args.patch_dir)
-		os.chdir(self.args.patch_dir)
 
 		# Example url:
 		# https://user:password@metrics.example.com:8086/dbname
@@ -113,6 +110,14 @@ class AlarmOBot:
 
 		return proc
 
+	def call_ngdp(self, args):
+		ngdp_dir = os.path.join(self.args.ngdp_dir, ".ngdp")
+		return self.call_proc(
+			[self.args.ngdp_bin, "--ngdp-dir", ngdp_dir, "--no-progress", *args],
+			log_stdout=True,
+			log_stderr=True
+		)
+
 	def write_to_influx(self, buildinfo):
 		if not self.influx:
 			return
@@ -158,16 +163,10 @@ class AlarmOBot:
 		except Exception:
 			self.logger.exception("Exception while sending email")
 
-	def get_buildinfo(self):
-		proc = self.call_proc([self.args.bin, "--buildinfo"])
-		stdout, stderr = proc.communicate()
-		err = stderr.decode("utf-8").strip() if stderr else ""
-		return stdout.decode("utf-8").strip(), err
-
-	def compare_builds(self, old_build, new_build):
+	def compare_versions(self, old_version, new_version):
 		self.check_count += 1
 
-		if old_build != new_build:
+		if old_version.versions_name != new_version.versions_name:
 			return True
 
 		if self.simulate_new_build and self.check_count == 1:
@@ -183,7 +182,7 @@ class AlarmOBot:
 			"@everyone Hearthstone build data updated",
 			tts=True
 		)
-		message = MESSAGE.format(old=old, new=new)
+		message = MESSAGE.format(old=old.versions_name, new=new.versions_name)
 		self.write_to_discord(message + "Downloading...")
 
 		# Send emails
@@ -193,51 +192,73 @@ class AlarmOBot:
 			for url in self.args.post_url:
 				requests.post(url)
 
-		# Start downloading the patch
-		self.logger.info("Downloading to {}...".format(self.args.patch_dir))
-		ngdptool_proc = self.call_proc(
-			[self.args.bin],
-			log_stdout=True,
-			log_stderr=True
-		)
+		out_dir = os.path.join(self.args.ngdp_dir, new.build_id)
 
-		ngdptool_proc.wait()
-		if ngdptool_proc.returncode == 0:
-			self.write_to_discord(
-				"Successfully downloaded new build to {}".format(
-					self.args.patch_dir
-				)
-			)
-		else:
+		# Start downloading the patch
+		self.logger.info("Downloading...")
+
+		ngdp_proc = self.call_ngdp(["fetch", "hsb"])
+
+		ngdp_proc.wait()
+		if ngdp_proc.returncode != 0:
 			self.write_to_discord(
 				"@everyone Patch download failed: ```{}```".format(
 					"\n".join(map(lambda lr: lr.getMessage(), self.log_buffer))
 				)
 			)
+			return
+
+		self.write_to_discord(
+			"Successfully downloaded new build, installing to {}...".format(
+				out_dir
+			)
+		)
+
+		ngdp_proc = self.call_ngdp([
+			"install",
+			new.build_config,
+			"--out-dir",
+			out_dir
+		])
+
+		ngdp_proc.wait()
+		if ngdp_proc.returncode != 0:
+			self.write_to_discord(
+				"@everyone Patch installation failed: ```{}```".format(
+					"\n".join(map(lambda lr: lr.getMessage(), self.log_buffer))
+				)
+			)
+		else:
+			self.write_to_discord(
+				"Successfully installed new build to {}".format(
+					out_dir
+				)
+			)
+
+	def get_latest_version(self):
+		remote = HttpRemote("http://us.patch.battle.net:1119/hsb")
+		try:
+			versions = remote.get_versions()
+		except Exception:
+			return None
+		versions = [v for v in versions if v.region in ["us", "eu"]]
+		return max(versions, key=lambda x: x.build_id)
 
 	def run(self):
 		try:
-			buildinfo, err = self.get_buildinfo()
-			if not buildinfo:
-				self.logger.warning(err)
-				raise RuntimeError("Could not get initial build info")
-			self.logger.info("Current buildinfo: %s", buildinfo)
+			version = self.get_latest_version()
+			self.logger.info("Current build: %s", version.versions_name)
 			while True:
-				new_buildinfo, err = self.get_buildinfo()
-				if not new_buildinfo:
+				new_version = self.get_latest_version()
+				if not new_version:
 					continue
 
-				try:
-					buildname = new_buildinfo.splitlines()[0].split()[1]
-				except ValueError:
-					buildname = "(invalid)"
+				if self.compare_versions(version, new_version):
+					self.logger.info("New build: %s", new_version.versions_name)
+					self.on_new_build(version, new_version)
+					version = new_version
 
-				if self.compare_builds(buildinfo, new_buildinfo):
-					self.logger.info("New buildinfo: %s", new_buildinfo)
-					self.on_new_build(buildinfo, new_buildinfo)
-					buildinfo = new_buildinfo
-
-				self.write_to_influx(buildname)
+				self.write_to_influx(version.versions_name)
 
 				time.sleep(5)
 		except KeyboardInterrupt:
