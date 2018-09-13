@@ -71,7 +71,8 @@ class AlarmOBot:
 		else:
 			self.influx = None
 
-		self.ses = boto3.client("ses")
+		if self.args.to_email and self.args.from_email:
+			self.ses = boto3.client("ses")
 		self.simulate_new_build = self.args.simulate_new_build
 		self.check_count = 0
 
@@ -141,7 +142,7 @@ class AlarmOBot:
 				logging.debug("Response: %r", resp)
 
 	def send_email(self, message):
-		if not self.args.to_email:
+		if not self.args.to_email or not self.args.from_email:
 			return
 
 		self.logger.debug("Attempting to send email")
@@ -166,6 +167,11 @@ class AlarmOBot:
 			self.logger.exception("Exception while sending email")
 
 	def compare_versions(self, old_version, new_version):
+		if not old_version or not old_version.versions_name:
+			raise ValueError("old_version is not a valid version object: %s" % old_version)
+		if not new_version or not new_version.versions_name:
+			raise ValueError("new_version is not a valid version object: %s" % new_version)
+
 		self.check_count += 1
 
 		if old_version.versions_name != new_version.versions_name:
@@ -239,25 +245,30 @@ class AlarmOBot:
 			versions = remote.get_versions()
 		except Exception:
 			return None
-		versions = [v for v in versions if v.region in ["us", "eu"]]
+		versions = [v for v in versions if v.region == "us"]
 		return max(versions, key=lambda x: x.build_id)
+
+
+	def check_for_new_version(self, current_version):
+		new_version = self.get_latest_version()
+		if not new_version:
+			return
+
+		if self.compare_versions(current_version, new_version):
+			self.logger.info("New build: %s", new_version.versions_name)
+			self.on_new_build(current_version, new_version)
+			current_version = new_version
+
+		self.write_to_influx(current_version.versions_name)
+		return current_version
+
 
 	def run(self):
 		try:
 			version = self.get_latest_version()
 			self.logger.info("Current build: %s", version.versions_name)
 			while True:
-				new_version = self.get_latest_version()
-				if not new_version:
-					continue
-
-				if self.compare_versions(version, new_version):
-					self.logger.info("New build: %s", new_version.versions_name)
-					self.on_new_build(version, new_version)
-					version = new_version
-
-				self.write_to_influx(version.versions_name)
-
+				version = self.check_for_new_version(version)
 				time.sleep(5)
 		except KeyboardInterrupt:
 			pass
