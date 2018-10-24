@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import boto3
 import requests
 from influxdb import InfluxDBClient
-from keg.http import HttpRemote
+from keg.remote.http import HttpRemote
 
 
 DEVNULL = open(os.devnull, "w")
