@@ -51,6 +51,7 @@ class AlarmOBot:
 		p.add_argument("--from-email", nargs="?", default="root@localhost")
 		p.add_argument("--to-email", nargs="*")
 		p.add_argument("--post-url", nargs="*")
+		p.add_argument("-v", "--verbose", action="store_true")
 		self.args = p.parse_args(args)
 
 		# Example url:
@@ -82,7 +83,8 @@ class AlarmOBot:
 			logging.basicConfig()
 
 		self.logger = logging.getLogger("alarmobot")
-		self.logger.setLevel(logging.DEBUG)
+		loglevel = logging.DEBUG if self.args.verbose else logging.INFO
+		self.logger.setLevel(loglevel)
 
 		self.log_buffer = DequeAdapter([], 10)
 		self.logger.addHandler(QueueHandler(self.log_buffer))
