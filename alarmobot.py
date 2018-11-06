@@ -24,7 +24,6 @@ MESSAGE = """
 ```
 {old}
 ```
-
 **New:**
 ```
 {new}
@@ -141,7 +140,7 @@ class AlarmOBot:
 			for webhook_url in self.args.webhook_url:
 				self.logger.debug("Sending to Discord: %r", message)
 				resp = requests.post(webhook_url, json={"content": message, "tts": tts})
-				logging.debug("Response: %r", resp)
+				self.logger.debug("Response: %r", resp)
 
 	def send_email(self, message):
 		if not self.args.to_email or not self.args.from_email:
@@ -195,7 +194,7 @@ class AlarmOBot:
 		message = MESSAGE.format(
 			mention=self.mention, old=old.versions_name, new=new.versions_name
 		)
-		self.write_to_discord(message + "Downloading...")
+		self.write_to_discord(message)
 
 		# Send emails
 		self.send_email(message)
@@ -207,7 +206,8 @@ class AlarmOBot:
 		out_dir = os.path.join(self.args.ngdp_dir, new.build_id)
 
 		# Start downloading the patch
-		self.logger.info("Downloading...")
+		self.write_to_discord("Downloading patch…")
+		self.logger.info("Downloading…")
 
 		ngdp_proc = self.call_ngdp(["fetch", "hsb"])
 
@@ -218,7 +218,7 @@ class AlarmOBot:
 			return
 
 		self.write_to_discord(
-			f"Successfully downloaded new build, installing to {out_dir}..."
+			f"Successfully downloaded new build, installing to `{out_dir}`…"
 		)
 
 		ngdp_proc = self.call_ngdp([
@@ -236,9 +236,7 @@ class AlarmOBot:
 			)
 		else:
 			self.write_to_discord(
-				"Successfully installed new build to {}".format(
-					out_dir
-				)
+				f"Successfully installed new build to `{out_dir}`!"
 			)
 
 	def get_latest_version(self):
