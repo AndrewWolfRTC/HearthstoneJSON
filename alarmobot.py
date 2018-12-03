@@ -253,7 +253,7 @@ class AlarmOBot:
 		new_version = self.get_latest_version()
 		if not new_version:
 			self.logger.warning("Got invalid version, skipping heartbeat")
-			return
+			return current_version
 
 		if self.compare_versions(current_version, new_version):
 			self.logger.info("New build: %s", new_version.versions_name)
