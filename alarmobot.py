@@ -267,6 +267,8 @@ class AlarmOBot:
 	def run(self):
 		try:
 			version = self.get_latest_version()
+			if not version or not version.versions_name:
+				raise RuntimeError("Unable to get current version")
 			self.logger.info("Current build: %s", version.versions_name)
 			while True:
 				version = self.check_for_new_version(version)
