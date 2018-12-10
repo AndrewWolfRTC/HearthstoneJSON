@@ -192,19 +192,19 @@ function extract_protos() {
 function generate_git_repositories() {
 	echo "Generating git repositories"
 
-	if ! git -C "$HSDATA_GIT" rev-parse "$BUILD" &>/dev/null; then
+	if ! git -C "$HSDATA_GIT" rev-parse "refs/tags/$BUILD" &>/dev/null; then
 		"$COMMIT_BIN" "hsdata" "$BUILD"
 	else
 		echo "Tag $BUILD already present in $HSDATA_GIT - Not committing."
 	fi
 
-	if ! git -C "$HSCODE_GIT" rev-parse "$BUILD" &>/dev/null; then
+	if ! git -C "$HSCODE_GIT" rev-parse "refs/tags/$BUILD" &>/dev/null; then
 		"$COMMIT_BIN" "hscode" "$BUILD"
 	else
 		echo "Tag $BUILD already present in $HSCODE_GIT - Not committing."
 	fi
 
-	if ! git -C "$HSPROTO_GIT" rev-parse "$BUILD" &>/dev/null; then
+	if ! git -C "$HSPROTO_GIT" rev-parse "refs/tags/$BUILD" &>/dev/null; then
 		"$COMMIT_BIN" "hsproto" "$BUILD"
 	else
 		echo "Tag $BUILD already present in $HSPROTO_GIT - Not committing."
