@@ -204,17 +204,10 @@ function generate_git_repositories() {
 		echo "Tag $BUILD already present in $HSCODE_GIT - Not committing."
 	fi
 
-	if ! git -C "$HSPROTO_GIT" rev-parse "refs/tags/$BUILD" &>/dev/null; then
-		"$COMMIT_BIN" "hsproto" "$BUILD"
-	else
-		echo "Tag $BUILD already present in $HSPROTO_GIT - Not committing."
-	fi
-
 	echo "Pushing to GitHub"
 	git -C "$HSDATA_GIT" push --follow-tags -f
 	git -C "$HSCODE_GIT" push --follow-tags -f
 	git -C "$HSCODE_GIT" push --follow-tags -f origin OSX:OSX
-	git -C "$HSPROTO_GIT" push --follow-tags -f
 }
 
 
@@ -254,7 +247,6 @@ function main() {
 	process_cardxml
 	decompile_code_win
 	decompile_code_osx
-	extract_protos
 	generate_git_repositories
 	generate_smartdiff
 	extract_card_textures
