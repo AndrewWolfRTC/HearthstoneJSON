@@ -78,6 +78,7 @@ MECHANICS_TAGS = [
 	GameTag.TAUNT,
 	GameTag.TOPDECK,
 	GameTag.TRIGGER_VISUAL,
+	GameTag.TWINSPELL,
 	GameTag.UNTOUCHABLE,
 	GameTag.WINDFURY,
 	GameTag.ImmuneToSpellpower,
