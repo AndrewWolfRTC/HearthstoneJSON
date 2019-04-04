@@ -7,8 +7,7 @@ from enum import IntEnum
 
 from hearthstone.cardxml import load
 from hearthstone.enums import CardType, Faction, GameTag, Locale
-from hearthstone.utils import SPELLSTONE_STRINGS
-
+from hearthstone.utils import SCHEME_CARDS, SPELLSTONE_STRINGS
 
 NBSP = "\u00A0"
 
@@ -129,7 +128,8 @@ def get_tags(card):
 	return tags, referenced_tags
 
 
-def clean_card_description(text, card_id):
+def clean_card_description(text, card):
+	card_id = card.id
 	text = text.replace("_", NBSP)
 	count = text.count("@")
 
@@ -138,6 +138,13 @@ def clean_card_description(text, card_id):
 
 	if card_id in SPELLSTONE_STRINGS:
 		return text, text.replace("@", "")
+	elif card_id in SCHEME_CARDS:
+
+		# Rise of Shadows schemes use '@' as a variable / placeholder, with a defaut value
+		# populated from a data tag.
+
+		num = card.tags.get(GameTag.TAG_SCRIPT_DATA_NUM_1, 0)
+		return text, text.replace("@", str(num), 1)
 
 	parts = text.split("@")
 	if len(parts) == 2:
@@ -149,7 +156,7 @@ def clean_card_description(text, card_id):
 
 
 def serialize_card(card):
-	text, collection_text = clean_card_description(card.description, card.id)
+	text, collection_text = clean_card_description(card.description, card)
 
 	ret = {
 		"id": card.card_id,
@@ -239,7 +246,7 @@ def export_all_locales_cards_to_file(cards, filename):
 			value = card.strings.get(tag, {})
 			if key == "text":
 				for locale, localized_value in value.items():
-					text, collection_text = clean_card_description(localized_value, card.id)
+					text, collection_text = clean_card_description(localized_value, card)
 					value[locale] = text
 					if collection_text:
 						obj["collectionText"][locale] = collection_text
