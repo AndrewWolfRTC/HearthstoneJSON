@@ -204,7 +204,10 @@ def serialize_card(card):
 		ret["multiClassGroup"] = card.multi_class_group.name
 
 	if card.requirements:
-		ret["playRequirements"] = {k.name: v for k, v in card.requirements.items()}
+		ret["playRequirements"] = {
+			k.name: v for k, v in card.requirements.items()
+			if hasattr(k, "name")
+		}
 
 	return ret
 
