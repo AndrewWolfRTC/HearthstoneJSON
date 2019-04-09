@@ -365,7 +365,7 @@ class CardXMLProcessor:
 		current_events = [
 			"post_set_rotation_2017",
 			"post_set_rotation_2018",
-			"pre_set_rotation_2019",
+			"post_set_rotation_2019",
 		]
 		for record in data["CARD_SET_TIMING"]:
 			dbf_id = record["m_CardId"]
